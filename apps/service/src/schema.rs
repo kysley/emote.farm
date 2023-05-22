@@ -4,9 +4,9 @@ diesel::table! {
     emote_occurrences (id) {
         id -> Nullable<Integer>,
         emote_name -> Text,
-        chatter_name -> Text,
         channel_name -> Text,
         occurrence_timestamp -> Nullable<Text>,
+        chatter_name -> Text,
     }
 }
 
@@ -14,7 +14,6 @@ diesel::table! {
     emote_usage (id) {
         id -> Nullable<Integer>,
         emote_name -> Text,
-        chatter_name -> Text,
         channel_name -> Text,
         usage_count -> Nullable<Integer>,
     }

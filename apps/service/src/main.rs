@@ -1,50 +1,58 @@
+use std::collections::HashMap;
+
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
-
+mod irc;
+mod models;
+mod occurence;
 mod schema;
-use schema::emote_occurrences;
 
-#[derive(Queryable, Debug)]
-struct EmoteOccurrence {
-    id: Option<i32>,
-    emote_name: String,
-    chatter_name: String,
-    channel_name: String,
-    occurrence_timestamp: Option<String>,
-}
+use irc::connect_to_irc;
+use serde::Deserialize;
 
-#[derive(Insertable)]
-#[table_name = "emote_occurrences"]
-struct NewOccurrence<'a> {
-    emote_name: &'a str,
-    chatter_name: &'a str,
-    channel_name: &'a str,
-    occurrence_timestamp: &'a str,
-}
-
-fn main() {
-    let mut connection = establish_connection();
-
-    let new_occurence = NewOccurrence {
-        emote_name: "Kappa",
-        chatter_name: "swan1",
-        channel_name: "moonmoon",
-        occurrence_timestamp: "5/20/2023, 9:36:47 PM",
-    };
-
-    diesel::insert_into(emote_occurrences::table).values(&new_occurence).execute(&mut connection).ok();
-
-    let results = emote_occurrences::table
-        .load::<EmoteOccurrence>(&mut connection)
-        .expect("Error loading emote occurrences");
-
-    for occurrence in results {
-        println!("{:?}", occurrence);
-    }
-}
-
-fn establish_connection() -> SqliteConnection {
+pub fn establish_connection() -> SqliteConnection {
     let database_url = "db.sqlite";
     SqliteConnection::establish(&database_url)
         .expect(&format!("Error connecting to {}", database_url))
+}
+#[derive(Debug, Deserialize)]
+struct BTTVEmote {
+    id: String,
+    code: String,
+}
+#[derive(Debug, Deserialize)]
+struct BTTVResponse {
+    channelEmotes: Vec<BTTVEmote>,
+    sharedEmotes: Vec<BTTVEmote>,
+}
+
+async fn fetch_bttv() -> Result<HashMap<String, String>, reqwest::Error> {
+    let channel_id = 121059319;
+    let url = format!(
+        "https://api.betterttv.net/3/cached/users/twitch/{}",
+        channel_id
+    );
+    let res: BTTVResponse = reqwest::Client::new().get(url).send().await?.json().await?;
+    let mut emote_map: HashMap<String, String> = HashMap::new();
+
+    for emote in res.channelEmotes.into_iter() {
+        emote_map.insert(emote.code, emote.id);
+    }
+
+    for emote in res.sharedEmotes.into_iter() {
+        emote_map.insert(emote.code, emote.id);
+    }
+
+    for (key, value) in &emote_map {
+        println!("{}: {}", key, value);
+    }
+
+    Ok(emote_map)
+}
+
+#[tokio::main]
+async fn main() {
+    let emote_map = fetch_bttv().await.unwrap();
+
+    connect_to_irc(emote_map).await;
 }
