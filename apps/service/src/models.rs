@@ -1,15 +1,14 @@
-use diesel::{prelude::*, sql_types::Integer};
+use diesel::prelude::*;
+use serde::Serialize;
 
 use crate::schema::emote_occurrences;
 use crate::schema::emote_usage;
 
-#[derive(Queryable, Debug)]
-pub struct EmoteOccurrence {
-    id: Option<i32>,
-    emote_name: String,
-    chatter_name: String,
-    channel_name: String,
-    occurrence_timestamp: Option<String>,
+#[derive(Queryable, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Usage {
+    pub usage_count: Option<i32>,
+    pub emote_name: String,
 }
 
 #[derive(Insertable)]
