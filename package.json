@@ -9,9 +9,9 @@
     "service:migration:run": "cd apps/service && diesel migration run --database-url ../../db.sqlite"
   },
   "devDependencies": {
-    "@turbo/gen": "^1.9.7",
-    "rome": "latest",
-    "turbo": "^1.9.7"
+    "@turbo/gen": "^1.9.9",
+    "rome": "^12.1.2",
+    "turbo": "^1.9.9"
   },
   "packageManager": "pnpm@7.15.0",
   "name": "emote.farm"
