@@ -1,3 +1,4 @@
+use diesel::helper_types::Nullable;
 use diesel::prelude::*;
 use serde::Serialize;
 
@@ -9,6 +10,13 @@ use crate::schema::emote_usage;
 pub struct Usage {
     pub usage_count: Option<i32>,
     pub emote_name: String,
+}
+
+#[derive(Queryable, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EmoteCount {
+    pub emote_name: String,
+    pub count: i64,
 }
 
 #[derive(Insertable)]

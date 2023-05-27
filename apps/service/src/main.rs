@@ -1,5 +1,8 @@
+use chrono::Duration;
+use diesel::dsl::{count, sql};
 use std::{collections::HashMap, net::SocketAddr};
 
+use axum::extract::Query;
 use axum::Extension;
 use axum::{extract::Path, routing::get, Router};
 use diesel::prelude::*;
@@ -10,9 +13,12 @@ mod occurence;
 mod schema;
 use irc::TwitchChannel;
 use models::Usage;
+use schema::emote_occurrences;
 use schema::emote_usage::{self};
 use serde::Deserialize;
 use tower_http::cors::{Any, CorsLayer};
+
+use crate::models::EmoteCount;
 
 pub fn establish_connection() -> SqliteConnection {
     let database_url = "db.sqlite";
@@ -62,7 +68,8 @@ async fn main() {
     tokio::spawn(async move {
         let app = Router::new()
             .route("/", get(root))
-            .route("/channel/:channel_name/totals", get(get_emote_totals))
+            .route("/channel/:channel_name/range", get(get_time_range))
+            .route("/channel/:channel_name/totals", get(get_totals))
             .route("/channel/:channel_name/emotes", get(get_ids))
             .layer(channels_extension)
             .layer(CorsLayer::new().allow_origin(Any));
@@ -92,7 +99,47 @@ async fn root() -> &'static str {
     "Hello, World!"
 }
 
-async fn get_emote_totals(Path(channel_name): Path<String>) -> String {
+#[derive(Debug, Deserialize)]
+struct TotalsRangeRequest {
+    time: Option<String>,
+}
+async fn get_time_range(
+    Path(channel_name): Path<String>,
+    Query(TotalsRangeRequest { time }): Query<TotalsRangeRequest>,
+) -> String {
+    let mut connection = establish_connection();
+
+    let duration_ago = Duration::hours(1).num_hours();
+
+    let results: Vec<(String, i64)> = emote_occurrences::table
+        .group_by(emote_occurrences::emote_name)
+        .filter(
+            emote_occurrences::channel_name.eq(channel_name).and(
+                emote_occurrences::occurrence_timestamp
+                    .ge(sql(&format!("datetime('now', '-{} hours')", 1))),
+            ),
+        )
+        .select((
+            emote_occurrences::emote_name,
+            count(emote_occurrences::emote_name),
+        ))
+        .load::<(String, i64)>(&mut connection)
+        .unwrap();
+
+    let transformed_results: Vec<EmoteCount> = results
+        .into_iter()
+        .map(|(name, count)| EmoteCount {
+            emote_name: name,
+            count,
+        })
+        .collect();
+
+    let result = serde_json::to_string(&transformed_results).unwrap();
+
+    result
+}
+
+async fn get_totals(Path(channel_name): Path<String>) -> String {
     let mut connection = establish_connection();
 
     // Select emote useage amount and name
