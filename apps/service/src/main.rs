@@ -68,7 +68,7 @@ async fn main() {
     tokio::spawn(async move {
         let app = Router::new()
             .route("/", get(root))
-            .route("/channel/:channel_name/range", get(get_time_range))
+            .route("/channel/:channel_name/since", get(get_emotes_since))
             .route("/channel/:channel_name/totals", get(get_totals))
             .route("/channel/:channel_name/emotes", get(get_ids))
             .layer(channels_extension)
@@ -101,24 +101,22 @@ async fn root() -> &'static str {
 
 #[derive(Debug, Deserialize)]
 struct TotalsRangeRequest {
-    time: Option<String>,
+    since: Option<i32>,
 }
-async fn get_time_range(
+async fn get_emotes_since(
     Path(channel_name): Path<String>,
-    Query(TotalsRangeRequest { time }): Query<TotalsRangeRequest>,
+    Query(TotalsRangeRequest { since }): Query<TotalsRangeRequest>,
 ) -> String {
     let mut connection = establish_connection();
 
-    let duration_ago = Duration::hours(1).num_hours();
-
     let results: Vec<(String, i64)> = emote_occurrences::table
         .group_by(emote_occurrences::emote_name)
-        .filter(
-            emote_occurrences::channel_name.eq(channel_name).and(
-                emote_occurrences::occurrence_timestamp
-                    .ge(sql(&format!("datetime('now', '-{} hours')", 1))),
-            ),
-        )
+        .filter(emote_occurrences::channel_name.eq(channel_name).and(
+            emote_occurrences::occurrence_timestamp.ge(sql(&format!(
+                "datetime('now', '-{} hours')",
+                since.unwrap_or_else(|| 1)
+            ))),
+        ))
         .select((
             emote_occurrences::emote_name,
             count(emote_occurrences::emote_name),
