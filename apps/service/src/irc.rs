@@ -7,7 +7,7 @@ use twitch_irc::{ClientConfig, SecureTCPTransport};
 
 use crate::fetch_bttv;
 use crate::models::{NewOccurrence, NewUsage};
-use crate::occurence::{add_occurance, increment_occurance};
+use crate::occurence::{add_occurance, add_occurance_old, increment_occurance};
 
 #[derive(Clone, Debug)]
 pub struct TwitchChannel {
@@ -61,6 +61,8 @@ impl TwitchChannel {
                         );
 
                         for part in text.split_whitespace() {
+                            let mut timestamp = String::from(&msg.server_timestamp.to_string());
+                            timestamp.truncate(timestamp.len() - 4);
                             match &self.emote_map.contains_key(part) {
                                 // Not sure if this can be replaced with an _. We don't care about a non-match yet
                                 true => {
@@ -69,11 +71,11 @@ impl TwitchChannel {
                                         emote_name: part,
                                         usage_count: 1,
                                     });
-                                    add_occurance(NewOccurrence {
+                                    add_occurance_old(NewOccurrence {
                                         emote_name: part,
                                         chatter_name: &sender,
                                         channel_name: &msg.channel_login,
-                                        occurrence_timestamp: &msg.server_timestamp.to_string(),
+                                        occurrence_timestamp: &timestamp,
                                     })
                                 }
                                 false => {}
@@ -83,7 +85,7 @@ impl TwitchChannel {
                         for emote in msg.emotes.into_iter() {
                             // Hard code for now, this ignores emotes like ":)". Could make a lookup for those later
                             if emote.code.starts_with("moon2") {
-                                add_occurance(NewOccurrence {
+                                add_occurance_old(NewOccurrence {
                                     emote_name: &emote.code,
                                     chatter_name: &sender,
                                     channel_name: &msg.channel_login,

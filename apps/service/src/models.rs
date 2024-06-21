@@ -1,4 +1,3 @@
-use diesel::helper_types::Nullable;
 use diesel::prelude::*;
 use serde::Serialize;
 
@@ -17,6 +16,14 @@ pub struct Usage {
 pub struct EmoteCount {
     pub emote_name: String,
     pub count: i64,
+}
+
+#[derive(Queryable, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecentEmote {
+    pub emote_name: String,
+    pub occurences: i32,
+    pub time_slot: String,
 }
 
 #[derive(Insertable)]

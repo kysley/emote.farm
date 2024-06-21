@@ -15,4 +15,7 @@ reqwest = { version = "0.11", features = ["json"] }
 axum = "0.6.18"
 tower-http = { version = "0.4.0", features = ["cors"] }
 chrono = { version = "0.4.24", features = ["serde"] }
+edgedb-tokio = "0.4.0"
+anyhow = "1.0.71"
+edgedb-protocol = "0.5.0"
 

@@ -1,0 +1,19 @@
+insert EmoteUsage {
+  channel_name := "test",
+  emote_name := "emote",
+  usage_count := 1
+}
+unless conflict on (.channel_name, .emote_name)
+else (
+  update EmoteUsage
+  set {
+    usage_count := .usage_count + 1
+  }
+)
+
+insert EmoteOccurance {
+  channel_name := "test",
+  chatter_name := "chatter",
+  emote_name := "emote",
+  timestamp := <cal::local_datetime>"2023-06-18T01:36:42.152"
+}

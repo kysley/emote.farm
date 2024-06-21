@@ -10,6 +10,7 @@
   import { createQuery } from "@tanstack/svelte-query";
   import { debounce } from "../../lib/debounce";
   import EmoteTable from "../../lib/components/emote-table.svelte";
+  import LineChart from "../../lib/components/line-chart.svelte";
 
   const DURATIONS = [1, 3, 8, 24];
 
@@ -67,6 +68,8 @@
 
 <main class="flex w-full flex-col p-5">
   <h1>{$page.params.channel}</h1>
+  <LineChart />
+
   <RadioButtonGroup bind:selected={viewMode}>
     <RadioButton labelText="Grid" value="grid" />
     <RadioButton labelText="Table" value="table" />

@@ -6,6 +6,8 @@
   const queryClient = new QueryClient();
 </script>
 
+<link rel="stylesheet" href="https://unpkg.com/@carbon/charts/styles.css" />
+
 <QueryClientProvider client={queryClient}>
   <slot />
 </QueryClientProvider>

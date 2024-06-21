@@ -1,18 +1,19 @@
 use chrono::Duration;
-use diesel::dsl::{count, sql};
+use diesel::dsl::{count, count_star, now, sql};
+use diesel::sql_types::{Integer, Text, Timestamp};
 use std::{collections::HashMap, net::SocketAddr};
 
 use axum::extract::Query;
 use axum::Extension;
 use axum::{extract::Path, routing::get, Router};
-use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
+use diesel::{prelude::*, sql_query, sqlite};
 mod irc;
 mod models;
 mod occurence;
 mod schema;
 use irc::TwitchChannel;
-use models::Usage;
+use models::{RecentEmote, Usage};
 use schema::emote_occurrences;
 use schema::emote_usage::{self};
 use serde::Deserialize;
@@ -71,6 +72,7 @@ async fn main() {
             .route("/channel/:channel_name/since", get(get_emotes_since))
             .route("/channel/:channel_name/totals", get(get_totals))
             .route("/channel/:channel_name/emotes", get(get_ids))
+            .route("/channel/:channel_name/recent", get(handle_get_top_recent))
             .layer(channels_extension)
             .layer(CorsLayer::new().allow_origin(Any));
         let addr = SocketAddr::from(([127, 0, 0, 1], 8012));
@@ -161,4 +163,56 @@ async fn get_ids(
         .find(|c| c.channel_name == channel_name)
         .unwrap();
     serde_json::to_string(channel.to_owned().get_emotes().await).unwrap()
+}
+
+#[derive(Queryable)]
+struct QueryResult {
+    time_slot: String,
+    emote_name: String,
+    occurrences: i32,
+}
+async fn handle_get_top_recent(Path(channel_name): Path<String>) -> String {
+    let mut connection = establish_connection();
+
+    let top_recent: Vec<(String, String, i32)> = emote_occurrences::table
+    // .group_by((sql::<diesel::sql_types::Text>("time_slot"), emote_occurrences::emote_name))
+    .group_by((
+       emote_occurrences::emote_name,
+    //     // diesel::dsl::sql::<diesel::sql_types::Text>("datetime((strftime('%s', occurrence_timestamp) / 300) * 300, 'unixepoch', 'localtime')")
+    ))
+    .select((
+        sql::<diesel::sql_types::Text>("datetime((strftime('%s', occurrence_timestamp) / 300) * 300, 'unixepoch', 'localtime') AS time_slot"),
+        emote_occurrences::emote_name,
+        sql::<diesel::sql_types::Integer>("COUNT(*) AS occurrences")
+    ))
+    .filter(emote_occurrences::channel_name.eq(channel_name)
+    .and(emote_occurrences::occurrence_timestamp.ge(sql(&format!(
+            "datetime('now', '-{} hours')",
+            1 // since.unwrap_or_else(|| 1)
+        ))))
+    .and(sql::<diesel::sql_types::Bool>("emote_name IN (
+        SELECT emote_name
+        FROM emote_occurrences
+        WHERE occurrence_timestamp >= datetime('now', '-1 hour')
+        GROUP BY emote_name
+        ORDER BY COUNT(*) DESC
+        LIMIT 5)")))
+
+    // .order_by(sql::<diesel::sql_types::Text>("time_slot DESC"))
+        .load::<(String, String, i32)>(&mut connection).expect("What went wrong");
+
+    // let results = serde_json::to_string(&top_recent).unwrap();
+
+    let transformed_results: Vec<RecentEmote> = top_recent
+        .into_iter()
+        .map(|(time_slot, emote_name, occurences)| RecentEmote {
+            time_slot,
+            emote_name,
+            occurences,
+        })
+        .collect();
+
+    // serde_json::to_string(&transformed_results).unwrap()
+
+    "asd".to_string()
 }
