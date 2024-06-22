@@ -8,6 +8,9 @@ import (
 	"strings"
 
 	"github.com/gempir/go-twitch-irc/v4"
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
+	"github.com/tmaxmax/go-sse"
 )
 
 type Emote struct {
@@ -24,11 +27,11 @@ func findEmotes(message string, bttv_lookup map[string]Emote, stv_lookup map[str
 		_, isStv := stv_lookup[word]
 
 		if isBttv && isStv {
-			fmt.Printf("Emote '%s' found in both lookups.\n", word)
+			// fmt.Printf("Emote '%s' found in both lookups.\n", word)
 		} else if isBttv {
-			fmt.Printf("Emote '%s' found in BTTV.\n", word)
+			// fmt.Printf("Emote '%s' found in BTTV.\n", word)
 		} else if isStv {
-			fmt.Printf("Emote '%s' found in 7TV.\n", word)
+			// fmt.Printf("Emote '%s' found in 7TV.\n", word)
 		} else {
 			fmt.Printf("Emote '%s' not found in any lookup.\n", word)
 		}
@@ -51,9 +54,9 @@ func getEmotes(url string, strct any) {
 }
 
 func main() {
-	// or client := twitch.NewAnonymousClient() for an anonymous user (no write capabilities)
 
-	// moonmoon
+	r := gin.Default()
+
 	var bttv_data BTTVResponse
 	getEmotes(bttv_url, &bttv_data)
 
@@ -62,6 +65,27 @@ func main() {
 
 	var stv_data STVResponse
 	getEmotes(sevenTv_url, &stv_data)
+
+	r.Use(cors.New(cors.Config{
+		AllowOrigins: []string{"*"}, // Adjust origins as needed
+	}))
+
+	r.GET("/lookup", func(ctx *gin.Context) {
+		ctx.JSON(http.StatusOK, gin.H{
+			"7tv":         stv_data,
+			"bttv":        bttv_data,
+			"bttv_global": bttv_global_data,
+		})
+	})
+
+	r.GET("/events", func(ctx *gin.Context) {
+		handler := sseHandler
+		handler.ServeHTTP(ctx.Writer, ctx.Request)
+	})
+
+	// or client := twitch.NewAnonymousClient() for an anonymous user (no write capabilities)
+
+	// moonmoon
 
 	bttv_lookup := make(map[string]Emote)
 	stv_lookup := make(map[string]Emote)
@@ -87,13 +111,37 @@ func main() {
 	client.OnPrivateMessage(func(message twitch.PrivateMessage) {
 		// fmt.Println(message.Message)
 		findEmotes(message.Message, bttv_lookup, stv_lookup)
-
+		m := &sse.Message{}
+		m.AppendData(message.Message)
+		_ = sseHandler.Publish(m)
 	})
 
 	client.Join("moonmoon")
+	go func() {
+		err := client.Connect()
 
-	err := client.Connect()
-	if err != nil {
-		panic(err)
-	}
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	// mux := http.NewServeMux()
+	// mux.HandleFunc("/lookup", func(w http.ResponseWriter, r *http.Request) {
+
+	// })
+
+	// mux.Handle("/events", sseHandler)
+
+	// handler := cors.Default().Handler(mux)
+
+	// if err := .ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+	// 	return err
+	// }
+
+	// if err := http.ListenAndServe(":8006", handler); err != nil {
+	// 	log.Fatalln(err)
+	// }
+
+	r.Run(":8006")
+
 }
